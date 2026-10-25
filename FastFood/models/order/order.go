@@ -58,15 +58,11 @@ func FromString(line string) (Order, error) {
 
 	d, _ := date.Parse(parts[2])
 	sum, _ := strconv.ParseFloat(parts[4], 64)
-	o := Order{
+	return Order{
 		CashierFIO: parts[0],
 		Address:    parts[1],
 		Date:       d,
 		Time:       parts[3],
 		Sum:        sum,
-	}
-	if err := o.Validate(); err != nil {
-		return Order{}, err
-	}
-	return o, nil
+	}, nil
 }

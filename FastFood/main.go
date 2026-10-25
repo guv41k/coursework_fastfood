@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -26,11 +28,16 @@ func main() {
 				win.Close()
 				return
 			}
-			size, err := strconv.Atoi(hashEntry.Text)
-			if err != nil || size < 15 || size > 20 {
+			size, err := strconv.Atoi(strings.TrimSpace(hashEntry.Text))
+			invalid := err != nil || size < 15 || size > 20
+			if invalid {
 				size = 17
 			}
 			ui.NewMainWindow(win, size)
+			if invalid {
+				dialog.ShowInformation("Размер хеш-таблицы",
+					fmt.Sprintf("Некорректный размер «%s», используется %d", hashEntry.Text, size), win)
+			}
 		}, win)
 
 	win.ShowAndRun()

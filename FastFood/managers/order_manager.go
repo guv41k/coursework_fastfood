@@ -10,29 +10,15 @@ import (
 
 type OrderManager struct {
 	items         []order.Order
-	ByCashierAddr *tree.BST[string, int]
+	byCashierAddr *tree.BST[string, int]
 	byDate        *tree.BST[date.Date, int]
-}
-
-func dateLess(a, b date.Date) bool {
-	if a.Year != b.Year {
-		return a.Year < b.Year
-	}
-	if a.Month != b.Month {
-		return a.Month < b.Month
-	}
-	return a.Day < b.Day
 }
 
 func NewOrderManager() *OrderManager {
 	return &OrderManager{
-		ByCashierAddr: tree.NewTree[string, int](func(a, b string) bool { return a < b }),
-		byDate:        tree.NewTree[date.Date, int](dateLess),
+		byCashierAddr: tree.NewTree[string, int](func(a, b string) bool { return a < b }),
+		byDate:        tree.NewTree[date.Date, int](date.Date.Before),
 	}
-}
-
-func orderKey(fio, address string) string {
-	return fio + "|" + address
 }
 
 func (m *OrderManager) Add(o order.Order, cashiers *CashierManager) error {
@@ -44,7 +30,7 @@ func (m *OrderManager) Add(o order.Order, cashiers *CashierManager) error {
 	}
 	m.items = append(m.items, o)
 	idx := len(m.items) - 1
-	m.ByCashierAddr.Insert(orderKey(o.CashierFIO, o.Address), idx)
+	m.byCashierAddr.Insert(fioAddrKey(o.CashierFIO, o.Address), idx)
 	m.byDate.Insert(o.Date, idx)
 	return nil
 }
@@ -54,14 +40,14 @@ func (m *OrderManager) Remove(index int) bool {
 		return false
 	}
 	o := m.items[index]
-	m.ByCashierAddr.Remove(orderKey(o.CashierFIO, o.Address), index)
+	m.byCashierAddr.Remove(fioAddrKey(o.CashierFIO, o.Address), index)
 	m.byDate.Remove(o.Date, index)
 
 	last := len(m.items) - 1
 	if index != last {
 		moved := m.items[last]
 		m.items[index] = moved
-		m.ByCashierAddr.UpdateValue(orderKey(moved.CashierFIO, moved.Address), last, index)
+		m.byCashierAddr.UpdateValue(fioAddrKey(moved.CashierFIO, moved.Address), last, index)
 		m.byDate.UpdateValue(moved.Date, last, index)
 	}
 	m.items = m.items[:last]
@@ -69,20 +55,18 @@ func (m *OrderManager) Remove(index int) bool {
 }
 
 func (m *OrderManager) HasOrdersFor(fio, address string) bool {
-	_, _, found := m.ByCashierAddr.Find(orderKey(fio, address))
+	_, _, found := m.byCashierAddr.Find(fioAddrKey(fio, address))
 	return found
 }
 
 func (m *OrderManager) FindByCashierAddress(fio, address string) ([]order.Order, int) {
-	list, steps, found := m.ByCashierAddr.Find(orderKey(fio, address))
+	list, steps, found := m.byCashierAddr.Find(fioAddrKey(fio, address))
 	if !found {
 		return nil, steps
 	}
 	var result []order.Order
 	for n := list.Head(); n != nil; n = n.Next {
-		if o, ok := m.At(n.Value); ok {
-			result = append(result, o)
-		}
+		result = append(result, m.items[n.Value])
 	}
 	return result, steps
 }
@@ -96,4 +80,18 @@ func (m *OrderManager) At(i int) (order.Order, bool) {
 		return order.Order{}, false
 	}
 	return m.items[i], true
+}
+
+func (m *OrderManager) Reset() {
+	m.items = nil
+	m.byCashierAddr.Clear()
+	m.byDate.Clear()
+}
+
+func (m *OrderManager) PrintByCashierAddr() string {
+	return m.byCashierAddr.PrintASCII(func(k string) string { return k })
+}
+
+func (m *OrderManager) PrintByDate() string {
+	return m.byDate.PrintASCII(date.Date.String)
 }

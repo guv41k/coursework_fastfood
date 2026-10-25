@@ -30,35 +30,35 @@ func (t *BST[K, V]) equal(a, b K) bool {
 }
 
 func (t *BST[K, V]) Insert(key K, value V) bool {
-	if list, _, found := t.Find(key); found {
-		for n := list.Head(); n != nil; n = n.Next {
-			if n.Value == value {
-				return false
-			}
-		}
-	}
-	t.root = t.insertNode(t.root, key, value)
-	return true
+	var inserted bool
+	t.root, inserted = t.insertNode(t.root, key, value)
+	return inserted
 }
 
-func (t *BST[K, V]) insertNode(n *node[K, V], key K, value V) *node[K, V] {
+func (t *BST[K, V]) insertNode(n *node[K, V], key K, value V) (*node[K, V], bool) {
 	if n == nil {
 		nn := &node[K, V]{
 			key:  key,
 			list: linkedlist.NewList[V](),
 		}
 		nn.list.Insert(value)
-		return nn
+		return nn, true
 	}
+	inserted := true
 	switch {
 	case t.equal(key, n.key):
+		for ln := n.list.Head(); ln != nil; ln = ln.Next {
+			if ln.Value == value {
+				return n, false
+			}
+		}
 		n.list.Insert(value)
 	case t.less(key, n.key):
-		n.left = t.insertNode(n.left, key, value)
+		n.left, inserted = t.insertNode(n.left, key, value)
 	default:
-		n.right = t.insertNode(n.right, key, value)
+		n.right, inserted = t.insertNode(n.right, key, value)
 	}
-	return n
+	return n, inserted
 }
 
 func (t *BST[K, V]) Find(key K) (list *linkedlist.LinkedList[V], steps int, found bool) {
@@ -78,43 +78,31 @@ func (t *BST[K, V]) Find(key K) (list *linkedlist.LinkedList[V], steps int, foun
 }
 
 func (t *BST[K, V]) Remove(key K, value V) bool {
-	list, _, found := t.Find(key)
-	if !found {
-		return false
-	}
-	valuePresent := false
-	for n := list.Head(); n != nil; n = n.Next {
-		if n.Value == value {
-			valuePresent = true
-			break
-		}
-	}
-	if !valuePresent {
-		return false
-	}
-	t.root = t.removeFromTree(t.root, key, value)
-	return true
+	var removed bool
+	t.root, removed = t.removeFromTree(t.root, key, value)
+	return removed
 }
 
-func (t *BST[K, V]) removeFromTree(n *node[K, V], key K, value V) *node[K, V] {
+func (t *BST[K, V]) removeFromTree(n *node[K, V], key K, value V) (*node[K, V], bool) {
 	if n == nil {
-		return nil
+		return nil, false
 	}
+	var removed bool
 	if t.less(key, n.key) {
-		n.left = t.removeFromTree(n.left, key, value)
-		return n
+		n.left, removed = t.removeFromTree(n.left, key, value)
+		return n, removed
 	}
 	if t.less(n.key, key) {
-		n.right = t.removeFromTree(n.right, key, value)
-		return n
+		n.right, removed = t.removeFromTree(n.right, key, value)
+		return n, removed
 	}
-	n.list.Remove(func(v V) bool {
+	removed = n.list.Remove(func(v V) bool {
 		return v == value
 	})
 	if n.list.Len() == 0 {
-		return t.deleteNode(n)
+		return t.deleteNode(n), removed
 	}
-	return n
+	return n, removed
 }
 
 func (t *BST[K, V]) deleteNode(n *node[K, V]) *node[K, V] {

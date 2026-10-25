@@ -12,21 +12,21 @@ type CashierManager struct {
 	index *hashtable.HashTable[int]
 }
 
+func fioAddrKey(fio, address string) string {
+	return fio + "|" + address
+}
+
 func NewCashierManager(hashSize int) *CashierManager {
 	return &CashierManager{
 		index: hashtable.NewHashTable[int](hashSize),
 	}
 }
 
-func cashierKey(fio, address string) string {
-	return fio + "|" + address
-}
-
 func (m *CashierManager) Add(c cashier.Cashier) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	key := cashierKey(c.FIO, c.Address)
+	key := fioAddrKey(c.FIO, c.Address)
 	if _, _, found := m.index.Find(key); found {
 		return fmt.Errorf("cashier: already exists")
 	}
@@ -42,7 +42,7 @@ func (m *CashierManager) Remove(fio, address string, orders *OrderManager) error
 	if orders.HasOrdersFor(fio, address) {
 		return fmt.Errorf("cashier: has orders")
 	}
-	key := cashierKey(fio, address)
+	key := fioAddrKey(fio, address)
 	idx, _, found := m.index.Find(key)
 	if !found {
 		return fmt.Errorf("cashier: not found")
@@ -53,14 +53,14 @@ func (m *CashierManager) Remove(fio, address string, orders *OrderManager) error
 	if idx != last {
 		moved := m.items[last]
 		m.items[idx] = moved
-		m.index.Update(cashierKey(moved.FIO, moved.Address), idx)
+		m.index.Update(fioAddrKey(moved.FIO, moved.Address), idx)
 	}
 	m.items = m.items[:last]
 	return nil
 }
 
 func (m *CashierManager) Find(fio, address string) (cashier.Cashier, int, bool) {
-	idx, steps, found := m.index.Find(cashierKey(fio, address))
+	idx, steps, found := m.index.Find(fioAddrKey(fio, address))
 	if !found {
 		return cashier.Cashier{}, steps, false
 	}
@@ -81,6 +81,11 @@ func (m *CashierManager) At(i int) (cashier.Cashier, bool) {
 		return cashier.Cashier{}, false
 	}
 	return m.items[i], true
+}
+
+func (m *CashierManager) Reset() {
+	m.items = nil
+	m.index.Reset()
 }
 
 func (m *CashierManager) Print() string {

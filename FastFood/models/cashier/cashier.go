@@ -63,9 +63,5 @@ func FromString(line string) (Cashier, error) {
 	}
 
 	salary, _ := strconv.ParseFloat(parts[2], 64)
-	c := Cashier{FIO: parts[0], Address: parts[1], Salary: salary}
-	if err := c.Validate(); err != nil {
-		return Cashier{}, err
-	}
-	return c, nil
+	return Cashier{FIO: parts[0], Address: parts[1], Salary: salary}, nil
 }

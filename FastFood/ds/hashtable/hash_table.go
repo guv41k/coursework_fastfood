@@ -44,43 +44,39 @@ func hash(key string, size int) int {
 }
 
 func (h *HashTable[V]) Insert(key string, value V) bool {
-	if _, _, found := h.Find(key); found {
-		return false
-	}
-
 	start := hash(key, h.size)
-	firstDeleted := -1
+	pos := -1
 
+probe:
 	for i := 0; i < h.size; i++ {
 		idx := (start + i) % h.size
-		if h.cells[idx].status == cellEmpty {
-			pos := idx
-			if firstDeleted >= 0 {
-				pos = firstDeleted
+		switch h.cells[idx].status {
+		case cellEmpty:
+			if pos < 0 {
+				pos = idx
 			}
-			h.cells[pos] = cell[V]{
-				key:    key,
-				value:  value,
-				status: cellOccupied,
+			break probe
+		case cellDeleted:
+			if pos < 0 {
+				pos = idx
 			}
-			h.count++
-			return true
-		}
-		if h.cells[idx].status == cellDeleted && firstDeleted < 0 {
-			firstDeleted = idx
+		default:
+			if h.cells[idx].key == key {
+				return false
+			}
 		}
 	}
 
-	if firstDeleted >= 0 {
-		h.cells[firstDeleted] = cell[V]{
-			key:    key,
-			value:  value,
-			status: cellOccupied,
-		}
-		h.count++
-		return true
+	if pos < 0 {
+		return false
 	}
-	return false
+	h.cells[pos] = cell[V]{
+		key:    key,
+		value:  value,
+		status: cellOccupied,
+	}
+	h.count++
+	return true
 }
 
 func (h *HashTable[V]) Find(key string) (value V, steps int, found bool) {

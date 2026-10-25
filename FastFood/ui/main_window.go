@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -224,20 +225,16 @@ func (mw *MainWindow) onFindCashier() {
 }
 
 func (mw *MainWindow) onShowStructures() {
-	cashierLabel := widget.NewLabel(mw.cm.Print())
-	cashierLabel.TextStyle = fyne.TextStyle{Monospace: true}
-	orderLabel := widget.NewLabel(mw.om.ByCashierAddr.PrintASCII(func(k string) string { return k }))
-	orderLabel.TextStyle = fyne.TextStyle{Monospace: true}
+	monoTab := func(title, text string) *container.TabItem {
+		label := widget.NewLabel(text)
+		label.TextStyle = fyne.TextStyle{Monospace: true}
+		return container.NewTabItem(title, container.NewScroll(label))
+	}
 
-	content := container.NewVSplit(
-		container.NewScroll(container.NewVBox(
-			widget.NewLabelWithStyle("Хеш-таблица кассиров", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			cashierLabel,
-		)),
-		container.NewScroll(container.NewVBox(
-			widget.NewLabelWithStyle("Дерево заказов (ФИО|адрес)", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			orderLabel,
-		)),
+	content := container.NewAppTabs(
+		monoTab("Хеш-таблица кассиров", mw.cm.Print()),
+		monoTab("Дерево заказов (ФИО|адрес)", mw.om.PrintByCashierAddr()),
+		monoTab("Дерево заказов (дата)", mw.om.PrintByDate()),
 	)
 	d := dialog.NewCustom("Структуры данных", "Закрыть", content, mw.win)
 	d.Resize(fyne.NewSize(600, 600))
@@ -417,21 +414,38 @@ func (mw *MainWindow) showLoadSummary(title string, loaded, skipped int, details
 	d.Show()
 }
 
-func (mw *MainWindow) onLoadCashiers() {
-	dialog.ShowFileOpen(func(r fyne.URIReadCloser, err error) {
-		if err != nil || r == nil {
-			return
+func (mw *MainWindow) confirmReplace(hasData bool, message string, proceed func()) {
+	if !hasData {
+		proceed()
+		return
+	}
+	dialog.ShowConfirm("Подтверждение", message, func(ok bool) {
+		if ok {
+			proceed()
 		}
-		defer r.Close()
-		loaded, skipped, details, err := iodata.LoadCashiers(r.URI().Path(), mw.cm)
-		if err != nil {
-			dialog.ShowError(err, mw.win)
-			return
-		}
-		mw.om = managers.NewOrderManager()
-		mw.refresh()
-		mw.showLoadSummary("Загрузка кассиров", loaded, skipped, details)
 	}, mw.win)
+}
+
+func (mw *MainWindow) onLoadCashiers() {
+	mw.confirmReplace(mw.cm.Size() > 0, "Текущие кассиры и заказы будут удалены. Продолжить?", func() {
+		dialog.ShowFileOpen(func(r fyne.URIReadCloser, err error) {
+			if err != nil || r == nil {
+				return
+			}
+			defer r.Close()
+			mw.cm.Reset()
+			mw.om.Reset()
+			mw.selectedCashierRow = -1
+			mw.selectedOrderRow = -1
+			loaded, skipped, details, err := iodata.LoadCashiers(r, mw.cm)
+			mw.refresh()
+			if err != nil {
+				dialog.ShowError(err, mw.win)
+				return
+			}
+			mw.showLoadSummary("Загрузка кассиров", loaded, skipped, details)
+		}, mw.win)
+	})
 }
 
 func (mw *MainWindow) onLoadOrders() {
@@ -439,45 +453,50 @@ func (mw *MainWindow) onLoadOrders() {
 		dialog.ShowInformation("Загрузить заказы", "Сначала загрузите кассиров", mw.win)
 		return
 	}
-	dialog.ShowFileOpen(func(r fyne.URIReadCloser, err error) {
-		if err != nil || r == nil {
+	mw.confirmReplace(mw.om.Size() > 0, "Текущие заказы будут удалены. Продолжить?", func() {
+		dialog.ShowFileOpen(func(r fyne.URIReadCloser, err error) {
+			if err != nil || r == nil {
+				return
+			}
+			defer r.Close()
+			mw.om.Reset()
+			mw.selectedOrderRow = -1
+			loaded, skipped, details, err := iodata.LoadOrders(r, mw.om, mw.cm)
+			mw.refresh()
+			if err != nil {
+				dialog.ShowError(err, mw.win)
+				return
+			}
+			mw.showLoadSummary("Загрузка заказов", loaded, skipped, details)
+		}, mw.win)
+	})
+}
+
+func (mw *MainWindow) saveTo(title string, count int, save func(io.Writer) error) {
+	dialog.ShowFileSave(func(w fyne.URIWriteCloser, err error) {
+		if err != nil || w == nil {
 			return
 		}
-		defer r.Close()
-		loaded, skipped, details, err := iodata.LoadOrders(r.URI().Path(), mw.om, mw.cm)
+		err = save(w)
+		if cerr := w.Close(); err == nil {
+			err = cerr
+		}
 		if err != nil {
 			dialog.ShowError(err, mw.win)
 			return
 		}
-		mw.refresh()
-		mw.showLoadSummary("Загрузка заказов", loaded, skipped, details)
+		dialog.ShowInformation(title, fmt.Sprintf("Сохранено: %d", count), mw.win)
 	}, mw.win)
 }
 
 func (mw *MainWindow) onSaveCashiers() {
-	dialog.ShowFileSave(func(w fyne.URIWriteCloser, err error) {
-		if err != nil || w == nil {
-			return
-		}
-		defer w.Close()
-		if err := iodata.SaveCashiers(w.URI().Path(), mw.cm); err != nil {
-			dialog.ShowError(err, mw.win)
-			return
-		}
-		dialog.ShowInformation("Сохранение кассиров", fmt.Sprintf("Сохранено: %d", mw.cm.Size()), mw.win)
-	}, mw.win)
+	mw.saveTo("Сохранение кассиров", mw.cm.Size(), func(w io.Writer) error {
+		return iodata.SaveCashiers(w, mw.cm)
+	})
 }
 
 func (mw *MainWindow) onSaveOrders() {
-	dialog.ShowFileSave(func(w fyne.URIWriteCloser, err error) {
-		if err != nil || w == nil {
-			return
-		}
-		defer w.Close()
-		if err := iodata.SaveOrders(w.URI().Path(), mw.om); err != nil {
-			dialog.ShowError(err, mw.win)
-			return
-		}
-		dialog.ShowInformation("Сохранение заказов", fmt.Sprintf("Сохранено: %d", mw.om.Size()), mw.win)
-	}, mw.win)
+	mw.saveTo("Сохранение заказов", mw.om.Size(), func(w io.Writer) error {
+		return iodata.SaveOrders(w, mw.om)
+	})
 }

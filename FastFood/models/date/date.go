@@ -40,6 +40,16 @@ func (d Date) String() string {
 	return fmt.Sprintf("%02d.%02d.%04d", d.Day, d.Month, d.Year)
 }
 
+func (d Date) Before(o Date) bool {
+	if d.Year != o.Year {
+		return d.Year < o.Year
+	}
+	if d.Month != o.Month {
+		return d.Month < o.Month
+	}
+	return d.Day < o.Day
+}
+
 func (d Date) IsValid() bool {
 	if d.Year < 1 || d.Month < 1 || d.Month > 12 || d.Day < 1 {
 		return false

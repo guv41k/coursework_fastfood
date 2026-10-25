@@ -7,6 +7,7 @@ type Node[T any] struct {
 
 type LinkedList[T any] struct {
 	head *Node[T]
+	tail *Node[T]
 	size int
 }
 
@@ -22,16 +23,10 @@ func (l *LinkedList[T]) Insert(v T) {
 
 	if l.head == nil {
 		l.head = newNode
-		l.size++
-		return
+	} else {
+		l.tail.Next = newNode
 	}
-
-	cur := l.head
-	for cur.Next != nil {
-		cur = cur.Next
-	}
-
-	cur.Next = newNode
+	l.tail = newNode
 	l.size++
 }
 
@@ -53,6 +48,9 @@ func (l *LinkedList[T]) Remove(pred func(T) bool) bool {
 				l.head = cur.Next
 			} else {
 				prev.Next = cur.Next
+			}
+			if cur == l.tail {
+				l.tail = prev
 			}
 
 			l.size--
