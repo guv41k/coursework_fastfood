@@ -23,6 +23,14 @@ jobs:
           go-version-file: FastFood/go.mod
           cache-dependency-path: FastFood/go.sum
 
+      - name: Check Go formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            printf 'Unformatted Go files:\n%s\n' "$unformatted"
+            exit 1
+          fi
+
       - name: Install Fyne dependencies
         run: |
           sudo apt-get update
