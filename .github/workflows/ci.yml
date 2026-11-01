@@ -36,6 +36,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
 
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+          working-directory: FastFood
+
       - run: go vet ./...
       - run: go test ./...
       - run: go build -o "$RUNNER_TEMP/fastfood" .

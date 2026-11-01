@@ -41,7 +41,9 @@ func SaveCashiers(w io.Writer, cm *managers.CashierManager) error {
 	bw := bufio.NewWriter(w)
 	for i := 0; i < cm.Size(); i++ {
 		c, _ := cm.At(i)
-		fmt.Fprintln(bw, c.String())
+		if _, err := fmt.Fprintln(bw, c.String()); err != nil {
+			return err
+		}
 	}
 	return bw.Flush()
 }
@@ -76,7 +78,9 @@ func SaveOrders(w io.Writer, om *managers.OrderManager) error {
 	bw := bufio.NewWriter(w)
 	for i := 0; i < om.Size(); i++ {
 		o, _ := om.At(i)
-		fmt.Fprintln(bw, o.String())
+		if _, err := fmt.Fprintln(bw, o.String()); err != nil {
+			return err
+		}
 	}
 	return bw.Flush()
 }
