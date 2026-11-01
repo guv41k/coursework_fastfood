@@ -432,12 +432,14 @@ func (mw *MainWindow) onLoadCashiers() {
 			if err != nil || r == nil {
 				return
 			}
-			defer r.Close()
 			mw.cm.Reset()
 			mw.om.Reset()
 			mw.selectedCashierRow = -1
 			mw.selectedOrderRow = -1
 			loaded, skipped, details, err := iodata.LoadCashiers(r, mw.cm)
+			if closeErr := r.Close(); err == nil {
+				err = closeErr
+			}
 			mw.refresh()
 			if err != nil {
 				dialog.ShowError(err, mw.win)
@@ -458,10 +460,12 @@ func (mw *MainWindow) onLoadOrders() {
 			if err != nil || r == nil {
 				return
 			}
-			defer r.Close()
 			mw.om.Reset()
 			mw.selectedOrderRow = -1
 			loaded, skipped, details, err := iodata.LoadOrders(r, mw.om, mw.cm)
+			if closeErr := r.Close(); err == nil {
+				err = closeErr
+			}
 			mw.refresh()
 			if err != nil {
 				dialog.ShowError(err, mw.win)
